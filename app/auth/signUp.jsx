@@ -12,19 +12,17 @@ export default function SignUp() {
     username: '',
     email: '',
     password: '',
-    confirmPassword: '',
   });
   
-  // Add state for password visibility
+  // Add state for password
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Animation values
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(30)).current;
-  const inputsSlideUp = useRef([0, 1, 2, 3].map(() => new Animated.Value(20))).current;
+  const inputsSlideUp = useRef([0, 1, 2].map(() => new Animated.Value(20))).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const inputScales = useRef([0, 1, 2, 3].map(() => new Animated.Value(1))).current;
+  const inputScales = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
 
   // Initial animations
   useEffect(() => {
@@ -98,14 +96,6 @@ export default function SignUp() {
 
   const renderInput = (input, index) => {
     const isPassword = input.placeholder.toLowerCase().includes('password');
-    const showPasswordState = input.placeholder === 'Password' ? showPassword : showConfirmPassword;
-    const togglePasswordVisibility = () => {
-      if (input.placeholder === 'Password') {
-        setShowPassword(!showPassword);
-      } else {
-        setShowConfirmPassword(!showConfirmPassword);
-      }
-    };
 
     return (
       <Animated.View
@@ -126,7 +116,7 @@ export default function SignUp() {
             placeholderTextColor="#999"
             value={input.value}
             onChangeText={input.onChange}
-            secureTextEntry={isPassword && !showPasswordState}
+            secureTextEntry={isPassword && !showPassword}
             keyboardType={input.keyboardType}
             autoCapitalize="none"
             onFocus={() => handleFocus(index)}
@@ -135,12 +125,12 @@ export default function SignUp() {
           />
           {isPassword && (
             <TouchableOpacity
-              onPress={togglePasswordVisibility}
+              onPress={() => setShowPassword(!showPassword)}
               style={styles.passwordToggle}
               activeOpacity={0.7}
             >
               <Ionicons
-                name={showPasswordState ? "eye-off" : "eye"}
+                name={showPassword ? "eye-off" : "eye"}
                 size={22}
                 color="#666"
               />
@@ -204,13 +194,6 @@ export default function SignUp() {
                   placeholder: 'Password',
                   value: formData.password,
                   onChange: (text) => setFormData({ ...formData, password: text }),
-                  icon: '🔒',
-                  secureTextEntry: true,
-                },
-                {
-                  placeholder: 'Confirm Password',
-                  value: formData.confirmPassword,
-                  onChange: (text) => setFormData({ ...formData, confirmPassword: text }),
                   icon: '🔒',
                   secureTextEntry: true,
                 },
