@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, Easing, TextInput, StatusBar, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, Easing, TextInput, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -14,6 +14,11 @@ export default function SignIn() {
   });
   
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+  });
 
   // Animation values
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -87,8 +92,90 @@ export default function SignIn() {
     }).start();
   };
 
+  // Add validation function
+  const validateInputs = () => {
+    let isValid = true;
+    const newErrors = {
+      email: '',
+      password: '',
+    };
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+      isValid = false;
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  // Add handleSubmit function
+  const handleSubmit = async () => {
+    if (!validateInputs()) {
+      const firstError = Object.values(errors).find(error => error !== '');
+      if (firstError) {
+        Alert.alert('Validation Error', firstError);
+      }
+      return;
+    }
+
+    setIsLoading(true);
+    const { email, password } = formData;
+
+    try {
+      const response = await fetch('http://192.168.41.67:3000/api/user/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid credentials');
+      }
+
+      // Success
+      Alert.alert(
+        'Success',
+        'Logged in successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/home') // Navigate to home screen after login
+          }
+        ]
+      );
+
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error.message || 'Something went wrong. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update renderInput to show error messages
   const renderInput = (input, index) => {
     const isPassword = input.placeholder.toLowerCase().includes('password');
+    const fieldName = input.placeholder.toLowerCase().includes('email') 
+      ? 'email' 
+      : 'password';
 
     return (
       <Animated.View
@@ -101,14 +188,22 @@ export default function SignIn() {
           width: '100%',
         }]}
       >
-        <View style={styles.inputContainer}>
+        <View style={[
+          styles.inputContainer,
+          errors[fieldName] ? styles.inputError : null
+        ]}>
           <Text style={styles.inputIcon}>{input.icon}</Text>
           <TextInput
             style={styles.input}
             placeholder={input.placeholder}
             placeholderTextColor="#999"
             value={input.value}
-            onChangeText={input.onChange}
+            onChangeText={(text) => {
+              setFormData({ ...formData, [fieldName]: text });
+              if (errors[fieldName]) {
+                setErrors({ ...errors, [fieldName]: '' });
+              }
+            }}
             secureTextEntry={isPassword && !showPassword}
             keyboardType={input.keyboardType}
             autoCapitalize="none"
@@ -130,9 +225,44 @@ export default function SignIn() {
             </TouchableOpacity>
           )}
         </View>
+        {errors[fieldName] ? (
+          <Text style={styles.errorText}>{errors[fieldName]}</Text>
+        ) : null}
       </Animated.View>
     );
   };
+
+  // Add renderButton function
+  const renderButton = () => (
+    <TouchableOpacity
+      onPress={handleSubmit}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={styles.buttonContainer}
+      activeOpacity={0.9}
+      disabled={isLoading}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale: buttonScale }],
+          width: '100%',
+        }}
+      >
+        <LinearGradient
+          colors={['#0A84FF', '#0066CC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.button}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Sign In</Text>
+          )}
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -171,10 +301,10 @@ export default function SignIn() {
 
               {[
                 {
-                  placeholder: 'Email or Username',
+                  placeholder: 'Email Address',
                   value: formData.email,
                   onChange: (text) => setFormData({ ...formData, email: text }),
-                  icon: '👤',
+                  icon: '✉️',
                   keyboardType: 'email-address',
                 },
                 {
@@ -194,29 +324,7 @@ export default function SignIn() {
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => {}}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                style={styles.buttonContainer}
-                activeOpacity={0.9}
-              >
-                <Animated.View
-                  style={{
-                    transform: [{ scale: buttonScale }],
-                    width: '100%',
-                  }}
-                >
-                  <LinearGradient
-                    colors={['#0A84FF', '#0066CC']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.button}
-                  >
-                    <Text style={styles.buttonText}>Sign In</Text>
-                  </LinearGradient>
-                </Animated.View>
-              </TouchableOpacity>
+              {renderButton()}
 
               <TouchableOpacity
                 onPress={() => router.push("/auth/signUp")}
@@ -349,5 +457,16 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
   },
 });

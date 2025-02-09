@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, Easing, TextInput, StatusBar, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Animated, Easing, TextInput, StatusBar, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -9,7 +9,7 @@ const { width, height } = Dimensions.get('window');
 export default function SignUp() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
     password: '',
   });
@@ -23,6 +23,16 @@ export default function SignUp() {
   const inputsSlideUp = useRef([0, 1, 2].map(() => new Animated.Value(20))).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const inputScales = useRef([0, 1, 2].map(() => new Animated.Value(1))).current;
+
+  // Add loading state
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Add error states
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    password: '',
+  });
 
   // Initial animations
   useEffect(() => {
@@ -94,8 +104,105 @@ export default function SignUp() {
     }).start();
   };
 
+  // Add input validation
+  const validateInputs = () => {
+    let isValid = true;
+    const newErrors = {
+      name: '',
+      email: '',
+      password: '',
+    };
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+      isValid = false;
+    } else if (formData.name.length < 2) {
+      newErrors.name = 'Name must be at least 2 characters';
+      isValid = false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      isValid = false;
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+      isValid = false;
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+      isValid = false;
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  // Update handleSubmit function
+  const handleSubmit = async () => {
+    if (!validateInputs()) {
+      const firstError = Object.values(errors).find(error => error !== '');
+      if (firstError) {
+        Alert.alert('Validation Error', firstError);
+      }
+      return;
+    }
+
+    setIsLoading(true);
+    const { name, email, password } = formData;
+
+    try {
+      const response = await fetch('http://192.168.41.67:3000/api/user/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to sign up');
+      }
+
+      // Success
+      Alert.alert(
+        'Success',
+        'Account created successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/auth/signIn')
+          }
+        ]
+      );
+
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error.message || 'Something went wrong. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update renderInput to show error messages
   const renderInput = (input, index) => {
     const isPassword = input.placeholder.toLowerCase().includes('password');
+    const fieldName = input.placeholder.toLowerCase().includes('email') 
+      ? 'email' 
+      : input.placeholder.toLowerCase().includes('password')
+        ? 'password'
+        : 'name';
 
     return (
       <Animated.View
@@ -108,14 +215,22 @@ export default function SignUp() {
           width: '100%',
         }]}
       >
-        <View style={styles.inputContainer}>
+        <View style={[
+          styles.inputContainer,
+          errors[fieldName] ? styles.inputError : null
+        ]}>
           <Text style={styles.inputIcon}>{input.icon}</Text>
           <TextInput
             style={styles.input}
             placeholder={input.placeholder}
             placeholderTextColor="#999"
             value={input.value}
-            onChangeText={input.onChange}
+            onChangeText={(text) => {
+              setFormData({ ...formData, [fieldName]: text });
+              if (errors[fieldName]) {
+                setErrors({ ...errors, [fieldName]: '' });
+              }
+            }}
             secureTextEntry={isPassword && !showPassword}
             keyboardType={input.keyboardType}
             autoCapitalize="none"
@@ -137,9 +252,44 @@ export default function SignUp() {
             </TouchableOpacity>
           )}
         </View>
+        {errors[fieldName] ? (
+          <Text style={styles.errorText}>{errors[fieldName]}</Text>
+        ) : null}
       </Animated.View>
     );
   };
+
+  // Update the button component to show loading state
+  const renderButton = () => (
+    <TouchableOpacity
+      onPress={handleSubmit}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={styles.buttonContainer}
+      activeOpacity={0.9}
+      disabled={isLoading}
+    >
+      <Animated.View
+        style={{
+          transform: [{ scale: buttonScale }],
+          width: '100%',
+        }}
+      >
+        <LinearGradient
+          colors={['#0A84FF', '#0066CC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.button}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Sign Up</Text>
+          )}
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -178,9 +328,9 @@ export default function SignUp() {
 
               {[
                 {
-                  placeholder: 'Username',
-                  value: formData.username,
-                  onChange: (text) => setFormData({ ...formData, username: text }),
+                  placeholder: 'Full Name',
+                  value: formData.name,
+                  onChange: (text) => setFormData({ ...formData, name: text }),
                   icon: '👤',
                 },
                 {
@@ -199,29 +349,7 @@ export default function SignUp() {
                 },
               ].map((input, index) => renderInput(input, index))}
 
-              <TouchableOpacity
-                onPress={() => {}}
-                onPressIn={handlePressIn}
-                onPressOut={handlePressOut}
-                style={styles.buttonContainer}
-                activeOpacity={0.9}
-              >
-                <Animated.View
-                  style={{
-                    transform: [{ scale: buttonScale }],
-                    width: '100%',
-                  }}
-                >
-                  <LinearGradient
-                    colors={['#0A84FF', '#0066CC']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.button}
-                  >
-                    <Text style={styles.buttonText}>Sign Up</Text>
-                  </LinearGradient>
-                </Animated.View>
-              </TouchableOpacity>
+              {renderButton()}
 
               <TouchableOpacity
                 onPress={() => router.push("/auth/signIn")}
@@ -344,5 +472,16 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 12,
+    marginLeft: 4,
   },
 });
