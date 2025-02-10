@@ -155,7 +155,7 @@ export default function SignIn() {
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/home') // Navigate to home screen after login
+            onPress: () => router.replace('/(tabs)/home') // Navigate to home screen after login
           }
         ]
       );
